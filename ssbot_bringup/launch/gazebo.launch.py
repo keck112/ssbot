@@ -19,9 +19,12 @@ def generate_launch_description():
     # Launch arguments
     world = LaunchConfiguration('world')
 
+    # World file path
+    default_world = os.path.join(pkg_bringup, 'worlds', 'empty_with_sensors.sdf')
+
     declare_world = DeclareLaunchArgument(
         'world',
-        default_value='empty.sdf',
+        default_value=default_world,
         description='Gazebo world file'
     )
 
@@ -68,7 +71,8 @@ def generate_launch_description():
         arguments=[
             '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
             '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
-            '/scan@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
+            '/scan_front@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
+            '/scan_rear@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
             '/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
             '/clock@rosgraph_msgs/msg/Clock@gz.msgs.Clock',
         ],

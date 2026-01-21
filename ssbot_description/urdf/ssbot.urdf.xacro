@@ -2,29 +2,45 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ssbot">
 
   <!-- ==================== Properties ==================== -->
-  <!-- Base dimensions (중형 로봇: 40cm x 35cm) -->
-  <xacro:property name="base_length" value="0.40"/>
-  <xacro:property name="base_width" value="0.35"/>
-  <xacro:property name="base_height" value="0.12"/>
-  <xacro:property name="base_mass" value="8.0"/>
+  <!-- Base dimensions: 600mm x 400mm -->
+  <xacro:property name="base_length" value="0.60"/>
+  <xacro:property name="base_width" value="0.40"/>
+  <xacro:property name="base_height" value="0.15"/>
+  <xacro:property name="base_mass" value="15.0"/>
 
   <!-- Wheel properties -->
-  <xacro:property name="wheel_radius" value="0.065"/>
-  <xacro:property name="wheel_width" value="0.04"/>
-  <xacro:property name="wheel_mass" value="0.5"/>
-  <xacro:property name="wheel_separation" value="0.30"/>
-  <xacro:property name="wheel_offset_x" value="-0.05"/>
+  <xacro:property name="wheel_radius" value="0.08"/>
+  <xacro:property name="wheel_width" value="0.05"/>
+  <xacro:property name="wheel_mass" value="0.8"/>
+  <xacro:property name="wheel_separation" value="0.35"/>
+  <xacro:property name="wheel_offset_x" value="0.0"/>
+  <xacro:property name="wheel_offset_z" value="${-base_height/2}"/>
 
-  <!-- Caster properties -->
-  <xacro:property name="caster_radius" value="0.025"/>
-  <xacro:property name="caster_mass" value="0.1"/>
-  <xacro:property name="caster_offset_x" value="0.15"/>
+  <!-- Caster properties (4 corners) -->
+  <xacro:property name="caster_radius" value="0.03"/>
+  <xacro:property name="caster_mass" value="0.2"/>
+  <xacro:property name="caster_offset_x" value="0.25"/>
+  <xacro:property name="caster_offset_y" value="0.15"/>
+  <!-- Caster z: caster center should be at caster_radius from ground -->
+  <xacro:property name="caster_offset_z" value="${caster_radius - wheel_radius - base_height/2}"/>
 
-  <!-- LiDAR properties -->
-  <xacro:property name="lidar_radius" value="0.035"/>
-  <xacro:property name="lidar_height" value="0.045"/>
-  <xacro:property name="lidar_mass" value="0.2"/>
-  <xacro:property name="lidar_offset_z" value="0.08"/>
+  <!-- SICK NanoScan3 properties -->
+  <!-- Dimensions: 80mm x 80mm x 101mm -->
+  <xacro:property name="lidar_size_x" value="0.08"/>
+  <xacro:property name="lidar_size_y" value="0.08"/>
+  <xacro:property name="lidar_size_z" value="0.101"/>
+  <xacro:property name="lidar_mass" value="0.5"/>
+
+  <!-- LiDAR positions (1 o'clock and 7 o'clock) -->
+  <!-- 1 o'clock: front-right corner -->
+  <xacro:property name="lidar_front_x" value="0.22"/>
+  <xacro:property name="lidar_front_y" value="-0.12"/>
+  <xacro:property name="lidar_front_yaw" value="${-pi/6}"/>
+
+  <!-- 7 o'clock: rear-left corner -->
+  <xacro:property name="lidar_rear_x" value="-0.22"/>
+  <xacro:property name="lidar_rear_y" value="0.12"/>
+  <xacro:property name="lidar_rear_yaw" value="${5*pi/6}"/>
 
   <!-- ==================== Materials ==================== -->
   <material name="dark_gray">
@@ -33,8 +49,8 @@
   <material name="black">
     <color rgba="0.1 0.1 0.1 1.0"/>
   </material>
-  <material name="orange">
-    <color rgba="1.0 0.5 0.0 1.0"/>
+  <material name="sick_yellow">
+    <color rgba="1.0 0.85 0.0 1.0"/>
   </material>
 
   <!-- ==================== Inertia Macros ==================== -->
@@ -87,14 +103,14 @@
     <joint name="${prefix}_wheel_joint" type="continuous">
       <parent link="base_link"/>
       <child link="${prefix}_wheel_link"/>
-      <origin xyz="${wheel_offset_x} ${side_reflect * wheel_separation/2} 0" rpy="0 0 0"/>
+      <origin xyz="${wheel_offset_x} ${side_reflect * wheel_separation/2} ${wheel_offset_z}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <dynamics damping="0.1" friction="0.1"/>
     </joint>
   </xacro:macro>
 
   <!-- ==================== Caster Macro ==================== -->
-  <xacro:macro name="caster" params="prefix x_offset">
+  <xacro:macro name="caster" params="prefix x_reflect y_reflect">
     <link name="${prefix}_caster_link">
       <visual>
         <geometry>
@@ -113,7 +129,42 @@
     <joint name="${prefix}_caster_joint" type="fixed">
       <parent link="base_link"/>
       <child link="${prefix}_caster_link"/>
-      <origin xyz="${x_offset} 0 ${-base_height/2 - caster_radius + 0.005}" rpy="0 0 0"/>
+      <origin xyz="${x_reflect * caster_offset_x} ${y_reflect * caster_offset_y} ${caster_offset_z}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- ==================== NanoScan3 LiDAR Macro ==================== -->
+  <xacro:macro name="nanoscan3" params="prefix x y yaw topic">
+    <link name="${prefix}_lidar_link">
+      <visual>
+        <geometry>
+          <box size="${lidar_size_x} ${lidar_size_y} ${lidar_size_z}"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <material name="sick_yellow"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="${lidar_size_x} ${lidar_size_y} ${lidar_size_z}"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </collision>
+      <xacro:box_inertia m="${lidar_mass}" x="${lidar_size_x}" y="${lidar_size_y}" z="${lidar_size_z}"/>
+    </link>
+
+    <joint name="${prefix}_lidar_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${prefix}_lidar_link"/>
+      <origin xyz="${x} ${y} ${base_height/2 + lidar_size_z/2}" rpy="0 0 ${yaw}"/>
+    </joint>
+
+    <!-- Scan frame at the top of the LiDAR -->
+    <link name="${prefix}_laser_frame"/>
+
+    <joint name="${prefix}_laser_joint" type="fixed">
+      <parent link="${prefix}_lidar_link"/>
+      <child link="${prefix}_laser_frame"/>
+      <origin xyz="0 0 ${lidar_size_z/2}" rpy="0 0 0"/>
     </joint>
   </xacro:macro>
 
@@ -146,43 +197,28 @@
   <xacro:wheel prefix="left" side_reflect="1"/>
   <xacro:wheel prefix="right" side_reflect="-1"/>
 
-  <!-- ==================== Casters ==================== -->
-  <xacro:caster prefix="front" x_offset="${caster_offset_x}"/>
+  <!-- ==================== Casters (4 corners) ==================== -->
+  <xacro:caster prefix="front_left" x_reflect="1" y_reflect="1"/>
+  <xacro:caster prefix="front_right" x_reflect="1" y_reflect="-1"/>
+  <xacro:caster prefix="rear_left" x_reflect="-1" y_reflect="1"/>
+  <xacro:caster prefix="rear_right" x_reflect="-1" y_reflect="-1"/>
 
-  <!-- ==================== LiDAR ==================== -->
-  <link name="lidar_link">
-    <visual>
-      <geometry>
-        <cylinder radius="${lidar_radius}" length="${lidar_height}"/>
-      </geometry>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <material name="orange"/>
-    </visual>
-    <collision>
-      <geometry>
-        <cylinder radius="${lidar_radius}" length="${lidar_height}"/>
-      </geometry>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-    </collision>
-    <xacro:cylinder_inertia m="${lidar_mass}" r="${lidar_radius}" h="${lidar_height}"/>
-  </link>
+  <!-- ==================== NanoScan3 LiDARs ==================== -->
+  <!-- Front-right LiDAR (1 o'clock position) -->
+  <xacro:nanoscan3 prefix="front"
+                   x="${lidar_front_x}"
+                   y="${lidar_front_y}"
+                   yaw="${lidar_front_yaw}"
+                   topic="scan_front"/>
 
-  <joint name="lidar_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="lidar_link"/>
-    <origin xyz="0 0 ${base_height/2 + lidar_offset_z}" rpy="0 0 0"/>
-  </joint>
+  <!-- Rear-left LiDAR (7 o'clock position) -->
+  <xacro:nanoscan3 prefix="rear"
+                   x="${lidar_rear_x}"
+                   y="${lidar_rear_y}"
+                   yaw="${lidar_rear_yaw}"
+                   topic="scan_rear"/>
 
-  <!-- LiDAR scan frame (센서 데이터 기준점) -->
-  <link name="laser_frame"/>
-
-  <joint name="laser_joint" type="fixed">
-    <parent link="lidar_link"/>
-    <child link="laser_frame"/>
-    <origin xyz="0 0 ${lidar_height/2}" rpy="0 0 0"/>
-  </joint>
-
-  <!-- ==================== IMU (Optional) ==================== -->
+  <!-- ==================== IMU ==================== -->
   <link name="imu_link"/>
 
   <joint name="imu_joint" type="fixed">

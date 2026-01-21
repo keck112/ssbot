@@ -18,14 +18,36 @@
     <mu2>1.0</mu2>
   </gazebo>
 
-  <gazebo reference="front_caster_link">
+  <gazebo reference="front_left_caster_link">
     <material>Gazebo/Grey</material>
     <mu1>0.0</mu1>
     <mu2>0.0</mu2>
   </gazebo>
 
-  <gazebo reference="lidar_link">
-    <material>Gazebo/Orange</material>
+  <gazebo reference="front_right_caster_link">
+    <material>Gazebo/Grey</material>
+    <mu1>0.0</mu1>
+    <mu2>0.0</mu2>
+  </gazebo>
+
+  <gazebo reference="rear_left_caster_link">
+    <material>Gazebo/Grey</material>
+    <mu1>0.0</mu1>
+    <mu2>0.0</mu2>
+  </gazebo>
+
+  <gazebo reference="rear_right_caster_link">
+    <material>Gazebo/Grey</material>
+    <mu1>0.0</mu1>
+    <mu2>0.0</mu2>
+  </gazebo>
+
+  <gazebo reference="front_lidar_link">
+    <material>Gazebo/Yellow</material>
+  </gazebo>
+
+  <gazebo reference="rear_lidar_link">
+    <material>Gazebo/Yellow</material>
   </gazebo>
 
   <!-- ==================== Differential Drive Plugin ==================== -->
@@ -33,8 +55,8 @@
     <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
       <left_joint>left_wheel_joint</left_joint>
       <right_joint>right_wheel_joint</right_joint>
-      <wheel_separation>0.30</wheel_separation>
-      <wheel_radius>0.065</wheel_radius>
+      <wheel_separation>0.35</wheel_separation>
+      <wheel_radius>0.08</wheel_radius>
       <odom_publish_frequency>50</odom_publish_frequency>
       <topic>cmd_vel</topic>
       <odom_topic>odom</odom_topic>
@@ -51,34 +73,66 @@
     </plugin>
   </gazebo>
 
-  <!-- ==================== 2D LiDAR Sensor ==================== -->
-  <gazebo reference="lidar_link">
-    <sensor name="lidar" type="gpu_lidar">
+  <!-- ==================== Front NanoScan3 LiDAR (1 o'clock) ==================== -->
+  <!-- SICK NanoScan3: 275° FOV, up to 3m safety / 40m detection -->
+  <gazebo reference="front_lidar_link">
+    <sensor name="front_lidar" type="gpu_lidar">
       <always_on>true</always_on>
-      <update_rate>10</update_rate>
+      <update_rate>15</update_rate>
       <visualize>true</visualize>
-      <topic>scan</topic>
+      <topic>scan_front</topic>
       <lidar>
         <scan>
           <horizontal>
-            <samples>360</samples>
+            <samples>275</samples>
             <resolution>1</resolution>
-            <min_angle>-3.14159</min_angle>
-            <max_angle>3.14159</max_angle>
+            <min_angle>-2.4</min_angle>
+            <max_angle>2.4</max_angle>
           </horizontal>
         </scan>
         <range>
-          <min>0.12</min>
-          <max>12.0</max>
-          <resolution>0.01</resolution>
+          <min>0.05</min>
+          <max>40.0</max>
+          <resolution>0.001</resolution>
         </range>
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.01</stddev>
+          <stddev>0.005</stddev>
         </noise>
       </lidar>
-      <frame_id>laser_frame</frame_id>
+      <frame_id>front_laser_frame</frame_id>
+    </sensor>
+  </gazebo>
+
+  <!-- ==================== Rear NanoScan3 LiDAR (7 o'clock) ==================== -->
+  <gazebo reference="rear_lidar_link">
+    <sensor name="rear_lidar" type="gpu_lidar">
+      <always_on>true</always_on>
+      <update_rate>15</update_rate>
+      <visualize>true</visualize>
+      <topic>scan_rear</topic>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>275</samples>
+            <resolution>1</resolution>
+            <min_angle>-2.4</min_angle>
+            <max_angle>2.4</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.05</min>
+          <max>40.0</max>
+          <resolution>0.001</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.005</stddev>
+        </noise>
+      </lidar>
+      <frame_id>rear_laser_frame</frame_id>
     </sensor>
   </gazebo>
 

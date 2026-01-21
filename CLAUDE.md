@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Interaction Preferences
+
+- **Language**: Always respond in English only
+
 ## Build Commands
 
 ```bash

@@ -1,0 +1,28 @@
+/**:
+  ros__parameters:
+    # Network settings
+    sensor_ip: "192.168.1.11"
+    host_ip: "192.168.1.100"
+    host_udp_port: 0
+
+    # Frame settings
+    frame_id: "rear_laser_frame"
+
+    # Scan settings
+    angle_start: -2.4      # ~-137.5 degrees
+    angle_end: 2.4         # ~137.5 degrees
+
+    # Channel settings (NanoScan3 typically channel 0)
+    channel_enabled: true
+    channel: 0
+
+    # General output flags
+    general_system_state: true
+    derived_settings: true
+    measurement_data: true
+    intrusion_data: false
+    application_io_data: false
+
+    # Features
+    use_persistent_config: false
+    min_intensities: 0.0
