@@ -64,18 +64,36 @@ def generate_launch_description():
         output='screen'
     )
 
+    # Bridge config file
+    bridge_config = os.path.join(pkg_bringup, 'config', 'ros_gz_bridge.yaml')
+
     # Bridge for ROS2 <-> Gazebo communication
     bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
-        arguments=[
-            '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
-            '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
-            '/scan_front@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
-            '/scan_rear@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
-            '/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
-            '/clock@rosgraph_msgs/msg/Clock@gz.msgs.Clock',
-        ],
+        arguments=['--ros-args', '-p', f'config_file:={bridge_config}'],
+        output='screen'
+    )
+
+    # Static transforms to map Gazebo sensor frames to URDF frames
+    static_tf_front_lidar = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'front_laser_frame', 'ssbot/base_footprint/front_lidar'],
+        output='screen'
+    )
+
+    static_tf_rear_lidar = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'rear_laser_frame', 'ssbot/base_footprint/rear_lidar'],
+        output='screen'
+    )
+
+    static_tf_imu = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0', '0', '0', '0', '0', '0', 'imu_link', 'ssbot/base_footprint/imu'],
         output='screen'
     )
 
@@ -85,4 +103,7 @@ def generate_launch_description():
         gazebo,
         spawn_robot,
         bridge,
+        static_tf_front_lidar,
+        static_tf_rear_lidar,
+        static_tf_imu,
     ])
