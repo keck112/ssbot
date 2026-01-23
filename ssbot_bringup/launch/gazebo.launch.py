@@ -3,7 +3,8 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
@@ -75,26 +76,40 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Static transforms to map Gazebo sensor frames to URDF frames
-    static_tf_front_lidar = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0', '0', '0', '0', '0', '0', 'front_laser_frame', 'ssbot/base_footprint/front_lidar'],
-        output='screen'
-    )
-
-    static_tf_rear_lidar = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0', '0', '0', '0', '0', '0', 'rear_laser_frame', 'ssbot/base_footprint/rear_lidar'],
-        output='screen'
-    )
-
-    static_tf_imu = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0', '0', '0', '0', '0', '0', 'imu_link', 'ssbot/base_footprint/imu'],
-        output='screen'
+    # Dual Laser Merger - merge front and rear LiDAR scans
+    laser_merger = ComposableNodeContainer(
+        name='laser_merger_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container',
+        composable_node_descriptions=[
+            ComposableNode(
+                package='dual_laser_merger',
+                plugin='merger_node::MergerNode',
+                name='dual_laser_merger',
+                parameters=[
+                    {'laser_1_topic': '/scan_front'},
+                    {'laser_2_topic': '/scan_rear'},
+                    {'merged_scan_topic': '/scan'},
+                    {'merged_cloud_topic': '/scan_cloud'},
+                    {'target_frame': 'base_link'},
+                    {'tolerance': 0.1},
+                    {'queue_size': 10},
+                    {'angle_increment': 0.00290888},  # ~1651 samples for 360deg
+                    {'scan_time': 0.0294},  # 1/34 Hz
+                    {'range_min': 0.05},
+                    {'range_max': 40.0},
+                    {'min_height': -0.1},
+                    {'max_height': 0.5},
+                    {'angle_min': -3.141592654},
+                    {'angle_max': 3.141592654},
+                    {'use_inf': True},
+                    {'enable_shadow_filter': False},
+                    {'enable_average_filter': False},
+                ],
+            )
+        ],
+        output='screen',
     )
 
     return LaunchDescription([
@@ -103,7 +118,5 @@ def generate_launch_description():
         gazebo,
         spawn_robot,
         bridge,
-        static_tf_front_lidar,
-        static_tf_rear_lidar,
-        static_tf_imu,
+        laser_merger,
     ])

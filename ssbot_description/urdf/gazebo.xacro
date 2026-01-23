@@ -79,13 +79,13 @@
   <gazebo reference="front_lidar_link">
     <sensor name="front_lidar" type="gpu_lidar">
       <always_on>true</always_on>
-      <update_rate>15</update_rate>
+      <update_rate>34</update_rate>
       <visualize>true</visualize>
       <topic>scan_front</topic>
       <lidar>
         <scan>
           <horizontal>
-            <samples>275</samples>
+            <samples>1651</samples>
             <resolution>1</resolution>
             <min_angle>-2.4</min_angle>
             <max_angle>2.4</max_angle>
@@ -99,10 +99,10 @@
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.005</stddev>
+          <stddev>0.001</stddev>
         </noise>
       </lidar>
-      <frame_id>front_laser_frame</frame_id>
+      <gz_frame_id>front_lidar_link</gz_frame_id>
     </sensor>
   </gazebo>
 
@@ -110,13 +110,13 @@
   <gazebo reference="rear_lidar_link">
     <sensor name="rear_lidar" type="gpu_lidar">
       <always_on>true</always_on>
-      <update_rate>15</update_rate>
+      <update_rate>34</update_rate>
       <visualize>true</visualize>
       <topic>scan_rear</topic>
       <lidar>
         <scan>
           <horizontal>
-            <samples>275</samples>
+            <samples>1651</samples>
             <resolution>1</resolution>
             <min_angle>-2.4</min_angle>
             <max_angle>2.4</max_angle>
@@ -130,10 +130,10 @@
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.005</stddev>
+          <stddev>0.001</stddev>
         </noise>
       </lidar>
-      <frame_id>rear_laser_frame</frame_id>
+      <gz_frame_id>rear_lidar_link</gz_frame_id>
     </sensor>
   </gazebo>
 
@@ -185,7 +185,7 @@
           </z>
         </linear_acceleration>
       </imu>
-      <frame_id>imu_link</frame_id>
+      <gz_frame_id>imu_link</gz_frame_id>
     </sensor>
   </gazebo>
 
