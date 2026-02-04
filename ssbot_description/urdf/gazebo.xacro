@@ -57,7 +57,7 @@
       <right_joint>right_wheel_joint</right_joint>
       <wheel_separation>0.35</wheel_separation>
       <wheel_radius>0.08</wheel_radius>
-      <odom_publish_frequency>50</odom_publish_frequency>
+      <odom_publish_frequency>33</odom_publish_frequency>
       <topic>cmd_vel</topic>
       <odom_topic>odom</odom_topic>
       <frame_id>odom</frame_id>

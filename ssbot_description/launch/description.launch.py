@@ -28,13 +28,13 @@ def generate_launch_description():
     )
 
     # Joint State Publisher GUI (for testing)
-    joint_state_publisher_gui = Node(
-        package='joint_state_publisher_gui',
-        executable='joint_state_publisher_gui',
-        output='screen'
-    )
+#    joint_state_publisher_gui = Node(
+#        package='joint_state_publisher_gui',
+#        executable='joint_state_publisher_gui',
+#        output='screen'
+#   )
 
     return LaunchDescription([
         robot_state_publisher,
-        joint_state_publisher_gui,
+#        joint_state_publisher_gui,
     ])

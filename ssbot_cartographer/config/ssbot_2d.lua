@@ -9,8 +9,8 @@ options = {
   -- FRAME CONFIGURATION (Must match your URDF!)
   -- ============================================================
   map_frame = "map",
-  tracking_frame = "imu_link",          -- Use "base_link" if no IMU
-  published_frame = "base_footprint",
+  tracking_frame = "base_footprint",    -- Changed to match laser merger target
+  published_frame = "odom",
   odom_frame = "odom",
 
   provide_odom_frame = false,           -- Use external odom from diff_drive
@@ -20,9 +20,9 @@ options = {
   use_landmarks = false,
 
   -- ============================================================
-  -- DUAL LIDAR CONFIGURATION
+  -- LIDAR CONFIGURATION (merged from dual LiDAR)
   -- ============================================================
-  num_laser_scans = 2,                  -- Two NanoScan3 sensors
+  num_laser_scans = 1,                  -- Single merged scan
   num_multi_echo_laser_scans = 0,
   num_subdivisions_per_laser_scan = 1,
   num_point_clouds = 0,
@@ -30,7 +30,7 @@ options = {
   -- ============================================================
   -- TIMING
   -- ============================================================
-  lookup_transform_timeout_sec = 0.2,
+  lookup_transform_timeout_sec = 0.5,
   submap_publish_period_sec = 0.3,
   pose_publish_period_sec = 5e-3,
   trajectory_publish_period_sec = 30e-3,
@@ -51,7 +51,7 @@ MAP_BUILDER.num_background_threads = 4
 -- ============================================================
 -- TRAJECTORY BUILDER 2D SETTINGS
 -- ============================================================
-TRAJECTORY_BUILDER_2D.use_imu_data = true  -- Set false if no IMU
+TRAJECTORY_BUILDER_2D.use_imu_data = false  -- Disabled for testing without IMU
 
 -- SICK NanoScan3 range settings
 TRAJECTORY_BUILDER_2D.min_range = 0.05

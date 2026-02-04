@@ -21,7 +21,7 @@ def generate_launch_description():
     world = LaunchConfiguration('world')
 
     # World file path
-    default_world = os.path.join(pkg_bringup, 'worlds', 'empty_with_sensors.sdf')
+    default_world = os.path.join(pkg_bringup, 'worlds', 'slam_test.sdf')
 
     declare_world = DeclareLaunchArgument(
         'world',
@@ -88,12 +88,13 @@ def generate_launch_description():
                 plugin='merger_node::MergerNode',
                 name='dual_laser_merger',
                 parameters=[
+                    {'use_sim_time': True},
                     {'laser_1_topic': '/scan_front'},
                     {'laser_2_topic': '/scan_rear'},
                     {'merged_scan_topic': '/scan'},
                     {'merged_cloud_topic': '/scan_cloud'},
                     {'target_frame': 'base_link'},
-                    {'tolerance': 0.1},
+                    {'tolerance': 1.0},
                     {'queue_size': 10},
                     {'angle_increment': 0.00290888},  # ~1651 samples for 360deg
                     {'scan_time': 0.0294},  # 1/34 Hz

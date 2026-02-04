@@ -19,7 +19,7 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'
         ),
 
-        # Cartographer node with dual LiDAR
+        # Cartographer node with single front LiDAR
         Node(
             package='cartographer_ros',
             executable='cartographer_node',
@@ -28,12 +28,11 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
             arguments=[
                 '-configuration_directory', config_dir,
-                '-configuration_basename', 'ssbot_2d.lua'
+                '-configuration_basename', 'ssbot_2d.lua',
+                '-collect_metrics',
             ],
             remappings=[
-                # Dual LiDAR: scan -> scan_1, scan_2 for Cartographer
-                ('scan_1', '/scan_front'),
-                ('scan_2', '/scan_rear'),
+                ('scan', '/scan'),  # Use merged dual LiDAR scan
                 ('odom', '/odom'),
                 ('imu', '/imu'),
             ],
