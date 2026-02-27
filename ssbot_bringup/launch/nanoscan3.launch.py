@@ -7,8 +7,8 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    pkg_dir = get_package_share_directory('ssbot_bringup')
-    config_dir = os.path.join(pkg_dir, 'config')
+    pkg_bringup = get_package_share_directory('ssbot_bringup')
+    params_dir = os.path.join(pkg_bringup, 'params')
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
 
@@ -19,35 +19,27 @@ def generate_launch_description():
             description='Use simulation time'
         ),
 
-        # Front NanoScan3 (1 o'clock position)
         Node(
             package='sick_safetyscanners2',
             executable='sick_safetyscanners2_node',
             name='nanoscan3_front',
-            namespace='',
             output='screen',
             parameters=[
-                os.path.join(config_dir, 'nanoscan3_front.yaml'),
+                os.path.join(params_dir, 'nanoscan3_front.yaml'),
                 {'use_sim_time': use_sim_time}
             ],
-            remappings=[
-                ('scan', '/scan_front'),
-            ],
+            remappings=[('scan', '/scan_front')],
         ),
 
-        # Rear NanoScan3 (7 o'clock position)
         Node(
             package='sick_safetyscanners2',
             executable='sick_safetyscanners2_node',
             name='nanoscan3_rear',
-            namespace='',
             output='screen',
             parameters=[
-                os.path.join(config_dir, 'nanoscan3_rear.yaml'),
+                os.path.join(params_dir, 'nanoscan3_rear.yaml'),
                 {'use_sim_time': use_sim_time}
             ],
-            remappings=[
-                ('scan', '/scan_rear'),
-            ],
+            remappings=[('scan', '/scan_rear')],
         ),
     ])
