@@ -29,10 +29,10 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
     use_pose_save = LaunchConfiguration('use_pose_save')
-    # world_x = LaunchConfiguration('world_x')
-    # world_y = LaunchConfiguration('world_y')
-    # world_z = LaunchConfiguration('world_z')
-    # world_yaw = LaunchConfiguration('world_yaw')
+    world_x = LaunchConfiguration('world_x')
+    world_y = LaunchConfiguration('world_y')
+    world_z = LaunchConfiguration('world_z')
+    world_yaw = LaunchConfiguration('world_yaw')
     
     lifecycle_nodes = ['cartographer']
     
@@ -115,9 +115,46 @@ def generate_launch_description():
         description='Whether to save the last pose to a file for use in next localization run',
     )
     
+    declare_world_x_cmd = DeclareLaunchArgument(
+        'world_x',
+        default_value='20.7',
+        description='VDA5050 world frame X offset from map (meters)',
+    )
+    declare_world_y_cmd = DeclareLaunchArgument(
+        'world_y',
+        default_value='17.1',
+        description='VDA5050 world frame Y offset from map (meters)',
+    )
+    declare_world_z_cmd = DeclareLaunchArgument(
+        'world_z',
+        default_value='0.0',
+        description='VDA5050 world frame Z offset from map (meters)',
+    )
+    declare_world_yaw_cmd = DeclareLaunchArgument(
+        'world_yaw',
+        default_value='-1.6',
+        description='VDA5050 world frame yaw offset from map (radians)',
+    )
+    
     load_nodes = GroupAction(
         actions=[
             SetParameter('use_sim_time', use_sim_time),
+            Node(
+                package='tf2_ros',
+                executable='static_transform_publisher',
+                name='world_to_map_publisher',
+                output='screen',
+                arguments=[
+                    '--x', world_x,
+                    '--y', world_y,
+                    '--z', world_z,
+                    '--yaw', world_yaw,
+                    '--pitch', '0.0',
+                    '--roll', '0.0',
+                    '--frame-id', 'world',
+                    '--child-frame-id', 'map',
+                ],
+            ),
             Node(
                 package='cartographer_ros',
                 executable='cartographer_node',
@@ -196,38 +233,12 @@ def generate_launch_description():
     ld.add_action(declare_log_level_cmd)
     ld.add_action(declare_use_pose_save_cmd)
     ld.add_action(declare_map_cmd)
+    ld.add_action(declare_world_x_cmd)
+    ld.add_action(declare_world_y_cmd)
+    ld.add_action(declare_world_z_cmd)
+    ld.add_action(declare_world_yaw_cmd)
 
     # Add the actions to launch all of the localiztion nodes
     ld.add_action(load_nodes)
 
     return ld
-
-    # return LaunchDescription([
-    #     DeclareLaunchArgument('use_sim_time', default_value='true'),
-    #     DeclareLaunchArgument('map_file', default_value='/home/ss/maps/my_map.pbstream'),
-    #     DeclareLaunchArgument('world_x', default_value='20.7',
-    #                           description='VDA5050 world frame X offset from map'),
-    #     DeclareLaunchArgument('world_y', default_value='17.1',
-    #                           description='VDA5050 world frame Y offset from map'),
-    #     DeclareLaunchArgument('world_z', default_value='0.0',
-    #                           description='VDA5050 world frame Z offset from map'),
-    #     DeclareLaunchArgument('world_yaw', default_value='-1.6',
-    #                           description='VDA5050 world frame yaw offset from map (radians)'),
-
-    #     # VDA5050 world -> map static transform
-    #     Node(
-    #         package='tf2_ros',
-    #         executable='static_transform_publisher',
-    #         name='world_to_map_publisher',
-    #         output='screen',
-    #         arguments=[
-    #             '--x', world_x,
-    #             '--y', world_y,
-    #             '--z', world_z,
-    #             '--yaw', world_yaw,
-    #             '--pitch', '0.0',
-    #             '--roll', '0.0',
-    #             '--frame-id', 'world',
-    #             '--child-frame-id', 'map',
-    #         ],
-    #     ),

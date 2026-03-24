@@ -17,7 +17,7 @@ from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from nav2_msgs.srv import SetRouteGraph
-from nav2_msgs.action import ComputeAndTrackRoute, FollowPath
+from nav2_msgs.action import ComputeRoute, ComputeAndTrackRoute, FollowPath
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QComboBox,
@@ -26,6 +26,9 @@ from PyQt5.QtWidgets import (
     QSizePolicy,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -44,6 +47,7 @@ class RouteCommanderNode(Node):
     def __init__(self):
         super().__init__('route_gui_commander')
         self._cb_group = ReentrantCallbackGroup()
+        self.nav = BasicNavigator()
 
         # SetRouteGraph service client
         self._graph_client = self.create_client(
@@ -70,9 +74,10 @@ class RouteCommanderNode(Node):
 
         self._route_goal_handle = None
         self._follow_goal_handle = None
-        self._current_edge_id = None   # edge 변경 감지용
-        self._latest_path = None       # feedback에서 받은 최신 path
-        self._follow_replacing = False  # edge 교체 중복 방지
+        self._follow_path_sent = False  # 현재 route에서 FollowPath 전송 여부
+        self._follow_sending = False    # send_goal_async 전송 중 중복 방지
+        self._follow_gen = 0            # stale 콜백 무시용 세대 번호
+        self._follow_lock = threading.Lock()
         self._signals: _Signals = None  # GUI에서 주입
 
     def set_signals(self, signals: _Signals):
@@ -116,33 +121,46 @@ class RouteCommanderNode(Node):
             if self._signals:
                 self._signals.nav_finished.emit('ERROR')
             return
+        
+        goal_msg = ComputeRoute.Goal()
+        goal_msg.goal_id = goal_id
+        goal_msg.use_poses = False
+        if start_id is not None:
+            goal_msg.start_id = start_id
+            goal_msg.use_start = True
+        else:
+            goal_msg.use_start = False  # route server가 TF로 현재 위치 자동 조회
+            goal_msg._use_poses = True
+            
+        
 
-        goal = ComputeAndTrackRoute.Goal()
-        goal.start_id = start_id
-        goal.goal_id = goal_id
-        goal.use_poses = False  # ID 기반 라우팅
-        goal.use_start = False  # 현재 위치에서 시작
+        # goal = ComputeAndTrackRoute.Goal()
+        # goal.goal_id = goal_id
+        # goal.use_poses = False
+        # if start_id is not None:
+        #     goal.start_id = start_id
+        #     goal.use_start = True
+        # else:
+        #     goal.use_start = False  # route server가 TF로 현재 위치 자동 조회
+        #     goal._use_poses = True
 
-        self._log(f'[Route] Start: {start_id} → Goal: {goal_id}')
-        send_future = self._route_client.send_goal_async(
-            goal,
-            feedback_callback=self._route_feedback_cb,
-        )
-        send_future.add_done_callback(self._route_goal_response_cb)
-
-    def _route_goal_response_cb(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self._log('[ERROR] compute_and_track_route goal 거부됨')
-            if self._signals:
-                self._signals.nav_finished.emit('REJECTED')
-            return
-
-        self._route_goal_handle = goal_handle
-        self._log('[Route] Goal 수락됨. 경로 추적 시작...')
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self._route_result_cb)
-
+        # self._log(f'[Route] Start: {start_id} → Goal: {goal_id}')
+        # send_future = self._route_client.send_goal_async(
+        #     goal,
+        #     feedback_callback=self._route_feedback_cb
+        # )
+        #send_future.add_done_callback(self._route_goal_response_cb)
+        # rclpy.spin_until_future_complete(self, send_future, timeout_sec=5.0)
+        # self._route_goal_handle = send_future.result()
+        # if not self._route_goal_handle.accepted:
+        #     self._log('[ERROR] compute_and_track_route goal 거부됨')
+        #     if self._signals:
+        #         self._signals.nav_finished.emit('REJECTED')
+        #     return
+        
+        # self._log('[Route] Goal 수락됨. 경로 추적 시작...')
+        
+        
     def _route_feedback_cb(self, feedback_msg):
         fb = feedback_msg.feedback
         lines = [
@@ -159,18 +177,25 @@ class RouteCommanderNode(Node):
         if self._signals:
             self._signals.feedback_update.emit(fb_text)
 
-        if fb.path.poses:
-            edge_changed = (fb.current_edge_id != self._current_edge_id)
-            self._current_edge_id = fb.current_edge_id
-            self._latest_path = fb.path
-
-            if self._follow_goal_handle is None and not self._follow_replacing:
-                # follow_path가 없으면 즉시 시작
+        if fb.path.poses and not self._follow_path_sent:
+            if self._follow_goal_handle is None:
+                self._follow_path_sent = True
                 self._send_follow_path(fb.path)
-            elif edge_changed and not self._follow_replacing:
-                # edge 변경 시 기존 follow_path 취소 후 새 path로 교체
-                self._log(f'[Follow] Edge {fb.current_edge_id} 진입 → follow_path 교체')
-                self._replace_follow_path(fb.path)
+
+    def _route_goal_response_cb(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self._log('[ERROR] compute_and_track_route goal 거부됨')
+            if self._signals:
+                self._signals.nav_finished.emit('REJECTED')
+            return
+
+        self._route_goal_handle = goal_handle
+        self._log('[Route] Goal 수락됨. 경로 추적 시작...')
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self._route_result_cb)
+
+    
 
     def _route_result_cb(self, future):
         result = future.result()
@@ -191,6 +216,7 @@ class RouteCommanderNode(Node):
                 self._signals.nav_finished.emit(f'DONE:{status}')
 
         self._route_goal_handle = None
+        self._follow_path_sent = False
 
     # -----------------------------------------------------------------------
     # Follow Path 전달
@@ -198,37 +224,29 @@ class RouteCommanderNode(Node):
     def _send_follow_path(self, path):
         if not self._follow_client.server_is_ready():
             return
-        if self._follow_goal_handle is not None:
-            return
+        with self._follow_lock:
+            if self._follow_goal_handle is not None or self._follow_sending:
+                return
+            self._follow_sending = True
+            gen = self._follow_gen
 
-        goal = FollowPath.Goal()
-        goal.path = path
-        goal.controller_id = 'FollowPath'
-        goal.goal_checker_id = 'general_goal_checker'
+        # goal = FollowPath.Goal()
+        # goal.path = path
+        # goal.controller_id = 'FollowPath'
+        # goal.progress_checker_id = 'progress_checker'
+        # goal.goal_checker_id = 'general_goal_checker'
 
-        send_future = self._follow_client.send_goal_async(goal)
-        send_future.add_done_callback(self._follow_goal_response_cb)
+        # send_future = self._follow_client.send_goal_async(goal)
+        # send_future.add_done_callback(lambda f: self._follow_goal_response_cb(f, gen))
+        result = self.nav.followPath(path, 'FollowPath', 'progress_checker', 'general_goal_checker')
+        self.log('followPath result: {result}')
 
-    def _replace_follow_path(self, path):
-        """기존 follow_path를 취소하고 새 path로 교체 (edge 전환 시 호출)"""
-        self._follow_replacing = True
-        handle = self._follow_goal_handle
-        if handle is not None:
-            cancel_future = handle.cancel_goal_async()
-            cancel_future.add_done_callback(
-                lambda f, p=path: self._after_cancel(p)
-            )
-        else:
-            self._follow_replacing = False
-            self._send_follow_path(path)
-
-    def _after_cancel(self, path):
-        self._follow_goal_handle = None
-        self._follow_replacing = False
-        self._send_follow_path(path)
-
-    def _follow_goal_response_cb(self, future):
+    def _follow_goal_response_cb(self, future, gen):
+        # if gen != self._follow_gen:
+        #     return  # stop_all 이후 날아온 stale 콜백 무시
+        # self._follow_sending = False
         goal_handle = future.result()
+        self._log('follow_path goal response received result={}'.format(goal_handle))
         if goal_handle.accepted:
             self._follow_goal_handle = goal_handle
             result_future = goal_handle.get_result_async()
@@ -236,20 +254,16 @@ class RouteCommanderNode(Node):
 
     def _follow_result_cb(self, future):
         self._follow_goal_handle = None
-        # follow_path 완료 즉시 최신 path로 재시작 (노드 간 gap 방지)
-        if self._latest_path is not None:
-            path = self._latest_path
-            self._latest_path = None
-            self._send_follow_path(path)
+        # feedback은 한 번만 오고 FollowPath가 전체 경로를 완주함 → 재시작 없음
 
     # -----------------------------------------------------------------------
     # 정지
     # -----------------------------------------------------------------------
     def stop_all(self):
         # 상태 초기화
-        self._latest_path = None
-        self._current_edge_id = None
-        self._follow_replacing = False
+        self._follow_path_sent = False
+        self._follow_sending = False
+        self._follow_gen += 1  # 이전 run의 콜백 무효화
 
         # follow_path 취소
         if self._follow_goal_handle is not None:
@@ -426,12 +440,13 @@ class RouteGuiCommander(QWidget):
     def _populate_combos(self):
         self.start_combo.clear()
         self.goal_combo.clear()
+        self.start_combo.addItem('None (현재 위치)', None)
         for n in self._graph_nodes:
             label = f"Node {n['id']}  ({n['x']:.1f}, {n['y']:.1f})"
             self.start_combo.addItem(label, n['id'])
             self.goal_combo.addItem(label, n['id'])
 
-        # 기본값: start=0, goal=last
+        # 기본값: start=None, goal=last
         if len(self._graph_nodes) > 1:
             self.goal_combo.setCurrentIndex(len(self._graph_nodes) - 1)
 
@@ -439,11 +454,11 @@ class RouteGuiCommander(QWidget):
         start_id = self.start_combo.currentData()
         goal_id = self.goal_combo.currentData()
 
-        if start_id is None or goal_id is None:
-            self._append_log('[ERROR] Start/Goal 노드를 선택하세요')
+        if goal_id is None:
+            self._append_log('[ERROR] Goal 노드를 선택하세요')
             return
 
-        if start_id == goal_id:
+        if start_id is not None and start_id == goal_id:
             self._append_log('[ERROR] Start와 Goal이 같습니다')
             return
 
@@ -452,7 +467,7 @@ class RouteGuiCommander(QWidget):
         self.feedback_label.setText('경로 계산 중...')
 
         threading.Thread(
-            target=lambda: self.node.start_route(start_id, goal_id), daemon=True
+            target=self.node.start_route(start_id, goal_id), daemon=True
         ).start()
 
     def _on_stop(self):

@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Interaction Preferences
 
 - **Language**: Always respond in Korean
+- **코드 수정 금지**: 사용자가 명시적으로 수정을 확인/요청하기 전까지 어떠한 코드/파일도 수정하지 않는다. 분석과 설명만 제공한다.
 
 ## Build Commands
 
@@ -75,6 +76,7 @@ This is a ROS 2 differential-drive robot (SSBot) workspace with Gazebo Harmonic 
 
 - **ssbot_description**: Robot model (URDF/Xacro), meshes, RViz configs
 - **ssbot_bringup**: Launch files, params, maps, worlds, and Python scripts for full robot bringup
+- **ssbot_behavior_tree**: Nav2 커스텀 BT 노드 플러그인 + BT XML 파일 (Groot2 compatible)
 - **ssbot_msgs**: Custom ROS 2 message/service definitions (template ready, no messages defined yet)
 - **dual_laser_merger**: Merges front/rear LiDAR scans into single 360-degree scan
 
@@ -102,12 +104,31 @@ ssbot_bringup/
   worlds/
     slam_test.sdf           # 기본 Gazebo 월드
     warehouse.sdf           # 창고 월드
+    empty_with_sensors.sdf  # 빈 공간 월드 (센서 테스트용)
   graphs/
     route_graph.geojson     # Nav2 Route Server 경로 그래프
   src/
     trajectory_starter.py   # Cartographer trajectory 자동 시작 (저장된 pose 사용)
     pose_saver.py           # 현재 pose를 JSON으로 주기적 저장
-    route_gui_commander.py  # VDA 5050 Route GUI (구현 중)
+    route_gui_commander.py  # Route Server GUI (GeoJSON 로드, 노드 선택, 주행 시작/정지)
+  test/                     # 학습용 / 테스트용 독립 스크립트 (패키지 외부)
+    robot_monitor.py        # ROS2 Node 학습용 (topic sub/pub)
+    action_client.py        # NavigateToPose Action 직접 제어 학습용
+    service_client.py       # Service 동기/비동기 호출 학습용
+    waypoint_navigator.py   # Waypoint 순회 예제 (BasicNavigator)
+```
+
+### ssbot_behavior_tree Layout
+
+```
+ssbot_behavior_tree/
+  include/ssbot_behavior_tree/bt_nodes/
+    wait_action.hpp         # SsbotWait BT 노드 헤더
+  src/bt_nodes/
+    wait_action.cpp         # SsbotWait 구현 (nav2_msgs::action::Wait 래핑)
+  behavior_trees/
+    user_navigate_to_pose.xml                            # 사용자 정의 NavigateToPose BT
+    navigate_through_poses_w_replanning_and_recovery.xml # NavigateThroughPoses + 복구 BT
 ```
 
 ### Robot Model (ssbot_description/urdf/)
@@ -123,8 +144,14 @@ ssbot_bringup/
 - **SLAM**: Cartographer (`backpack_2d.lua`, scan_front + scan_rear 직접 입력)
 - **Localization**: Cartographer localization (`localization_2d.lua`, pbstream 맵 로드)
   - `trajectory_starter.py`: 이전 세션 저장 pose로 초기 trajectory 자동 시작
-  - `pose_saver.py`: 1초마다 현재 pose를 `maps/last_pose.json`에 저장
+  - `pose_saver.py`: `/trajectory_started` 토픽 수신 후 1초마다 pose 저장
+  - `world→map` TF: VDA5050 world 좌표계를 위한 static_transform_publisher 내장
+    - 기본값: `world_x=20.7 world_y=17.1 world_yaw=-1.6` (warehouse 기준, 인자로 변경 가능)
 - **Navigation**: Nav2 with MPPI controller, NavfnPlanner, waypoint_follower
+- **커스텀 BT 노드**: `ssbot_behavior_tree` 패키지 (`ssbot_bt_nodes.so` 플러그인)
+  - `SsbotWait`: nav2_msgs::action::Wait 래핑, `wait_duration` 포트 입력
+- **커스텀 BT XML**: `nav2_params.yaml`에 custom BT 경로 등록
+  - `default_nav_through_poses_bt_xml`: `navigate_through_poses_w_replanning_and_recovery.xml`
 - **Route Server**: Nav2 Route Server with GeoJSON graph support (VDA LIF Editor compatible)
 - **Costmap**: Static layer (map), obstacle layer (scan_front + scan_rear), inflation layer
 - **Collision Monitor**: Footprint approach with scan source
@@ -139,74 +166,51 @@ ssbot_bringup/
 - `/clock` (Clock): Simulation time
 - `/map` (OccupancyGrid): Map from Cartographer occupancy grid node
 
-## Current Development Goal: VDA 5050 Route Navigation
+## Current Development Goal: VDA 5050 기반 자율주행 시스템
 
-### Overview
-Nav2 Route Server를 VDA 5050 프로토콜 기반으로 제어하는 시스템 구현.
-BT(Behavior Tree) 방식이 아닌 **직접 Action 호출 방식**으로 구현.
+### 목표
+로봇의 모든 주행 방식을 **VDA 5050 프로토콜 사양에 맞춰 구현**하는 것.
+- VDA 5050을 기본 설계 기준으로 삼고, 프로토콜이 요구하는 모든 사양(노드 액션, 엣지 속도 제한, deviation, orientation 등)을 만족해야 함
+- 추후 TCP/IP, UDP 등 다른 통신 방식 추가를 고려한 확장 가능한 구조
+- FMS(Fleet Management System) / ACS와의 연동을 최종 목표로 하되, 현재는 프로토콜 사양에 맞는 동작 구현이 우선
+- FMS가 없는 개발/테스트 환경을 위한 **디버그용 GUI 주행 명령 도구** 필요
 
-### Core Architecture
+### 시스템 레이어 구조
 ```
-GeoJSON Graph → set_route_graph (service) → Route Server
-                                                  ↓
-GUI (Start/Stop) → compute_and_track_route (action) → feedback loop
-                                                  ↓
-                   feedback(path) → follow_path (action) → Controller Server
-```
-
-### VDA 5050 ↔ nav2_route 매핑
-- VDA 5050 **Action** = nav2_route **Operation** (플러그인)
-  - action `name` → operation name
-  - action `type` → operation type
-  - `blockingType: HARD` → blocking RouteOperation (node에서 정지 후 실행)
-  - `blockingType: SOFT` → non-blocking TriggerEvent
-- VDA 5050 **Edge** `maxSpeed` → metadata `abs_speed_limit` → `AdjustSpeedLimit` operation
-- VDA 5050 **Edge** `rotationAllowed: false` → node 도달 후 Spin → 진행
-- VDA 5050 **Node** `deviationXY/Theta` → goal tolerance (추후 구현)
-
-### Key Interfaces
-- `nav2_msgs/srv/SetRouteGraph` → `route_server/set_route_graph`
-  - Request: `graph_filepath` (string)
-  - Response: `success` (bool)
-- `nav2_msgs/action/ComputeAndTrackRoute`
-  - Goal: `start_id`, `goal_id`, `use_poses`, `start`, `goal`, `use_start`
-  - Feedback: `last_node_id`, `next_node_id`, `current_edge_id`, `route`, `path`, `operations_triggered`, `rerouted`
-- `nav2_msgs/action/FollowPath`
-  - Goal: `path`, `controller_id`
-
-### GeoJSON Graph Format (nav2_route)
-```json
-{
-  "features": [
-    { "geometry": {"type": "Point", "coordinates": [x, y]},
-      "properties": {"id": 0, "frame": "map",
-        "metadata": {"theta": 0.0},
-        "operations": [{"type": "ActionName", "trigger": "ON_ENTER",
-                        "metadata": {"action_type": "wait", "duration": 5.0}}]} },
-    { "geometry": {"type": "MultiLineString"},
-      "properties": {"id": 100, "startid": 0, "endid": 1,
-        "metadata": {"abs_speed_limit": 0.5, "rotation_allowed": false}} }
-  ]
-}
+[FMS / ACS]  ← 최종 목표: VDA 5050 (MQTT 등)
+      ↕
+[VDA 5050 Order Client]  ← 프로토콜 레이어 (Order 관리, State 보고, Instant Action)
+      ↕ ROS 2 actions/services
+[Nav2 Navigation Stack]  ← 주행 레이어 (경로 계획, 추종, 복구)
+  - 주행 백엔드: FollowPath / Route Server / 커스텀 BT 중 최적 방식 선택
+      ↕
+[Robot Hardware / Gazebo]
 ```
 
-### Route Server Operations (nav2_route plugins)
-- `AdjustSpeedLimit` — edge `abs_speed_limit` 메타데이터로 속도 자동 제한
-- `CollisionMonitor` — 장애물 감지 시 정지(`reroute_on_collision: false`) 또는 회피
-- `ReroutingService` — 외부 서비스 요청으로 재경로
-- (커스텀) `HardActionOperation` — `blockingType: HARD` action 처리 (node에서 blocking)
-- (커스텀) `PreEdgeRotationOperation` — `rotation_allowed: false` edge 전 Spin
+### VDA 5050 구현 필수 사양
+- **Order**: 노드-엣지 그래프 기반 주행 명령 수신 및 실행
+- **Node Action**: `blockingType: HARD` (노드 정지 후 실행) / `SOFT` (주행 중 트리거)
+- **Edge**: `maxSpeed` 속도 제한, `rotationAllowed` 회전 허용 여부
+- **Node Deviation**: `deviationXY` / `deviationTheta` — 노드별 허용 오차
+- **Orientation**: 노드 도착 후 지정 방향 정렬
+- **State 보고**: 현재 위치, 동작 상태, 에러 등 주기적 보고
+- **Instant Action**: 즉각 실행 명령 (정지, 취소 등) 비동기 처리
+
+### 개발 방향 결정 사항
+- **주행 레이어**: Nav2 기존 BT 노드(ComputePathToPose, FollowPath, Spin 등) 조합 + VDA 5050 전용 커스텀 BT 노드 최소화
+- **프로토콜 레이어**: VDA 5050 Order Client ROS 2 노드로 분리 구현
+- **테스트 도구**: FMS 없이 주행 명령을 보낼 수 있는 디버그 GUI
 
 ### Current Implementation Status
 - [x] `bringup_launch.py` — Cartographer + Nav2 통합 bringup (slam/localization 선택)
 - [x] `slam_launch.py` — Cartographer SLAM
-- [x] `localization_launch.py` — Cartographer Localization + trajectory_starter + pose_saver
-- [x] `trajectory_starter.py` — 저장된 pose로 Cartographer trajectory 자동 시작
-- [x] `pose_saver.py` — 현재 pose 주기적 저장
-- [ ] `route_gui_commander.py` — **현재 구현 중**
-  - Graph 불러오기 (Browse + Load → set_route_graph service)
-  - Start/Stop (compute_and_track_route action)
-  - Feedback 표시 (last_node_id, next_node_id, current_edge_id 등)
+- [x] `localization_launch.py` — Cartographer Localization + trajectory_starter + pose_saver + world TF
+- [x] `trajectory_starter.py` — 저장된 pose로 Cartographer trajectory 자동 시작, `/trajectory_started` 신호 발행
+- [x] `pose_saver.py` — `/trajectory_started` 수신 후 pose 주기적 저장
+- [x] `ssbot_behavior_tree` — `SsbotWait` 커스텀 BT 노드 + BT XML 파일 2개
+- [x] `route_gui_commander.py` — PyQt5 Route GUI 기본 구현 (개발 중, 일부 미완성)
+- [ ] VDA 5050 Order Client — **구현 예정** (프로토콜 레이어)
+  - nodes/edges → Nav2 명령 변환, State 보고, Instant Action 처리
 
 ### Launch for Full System Test
 ```bash

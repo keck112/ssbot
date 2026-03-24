@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="navigate_path_through_poses">
+    <Sequence>
+      <Fallback>
+        <ComputePathThroughPoses goals="{goals}"
+                                 path="{path}"
+                                 error_code_id="{compute_path_error_code}"/>
+        <WouldAPlannerRecoveryHelp error_code="{compute_path_error_code}"/>
+      </Fallback>
+      <Fallback>
+        <FollowPath controller_id="FollowPath"
+                    path="{path}"
+                    error_code_id="{follow_path_error_code}"/>
+        <WouldAControllerRecoveryHelp error_code="{follow_path_error_code}"/>
+      </Fallback>
+    </Sequence>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Action ID="ComputePathThroughPoses">
+      <input_port name="goals">Destinations to plan through</input_port>
+      <input_port name="start">Start pose of the path if overriding current robot pose</input_port>
+      <input_port name="server_name">Server name</input_port>
+      <input_port name="server_timeout">Server timeout</input_port>
+      <input_port name="planner_id">Mapped name to the planner plugin type to use</input_port>
+      <output_port name="path">Path created by ComputePathToPose node</output_port>
+      <output_port name="error_code_id">"Compute path through poses error code"</output_port>
+    </Action>
+    <Action ID="FollowPath">
+      <input_port name="controller_id"
+                  default="FollowPath"/>
+      <input_port name="path">Path to follow</input_port>
+      <input_port name="goal_checker_id">Goal checker</input_port>
+      <input_port name="progress_checker_id">Progress checker</input_port>
+      <input_port name="server_name">Action server name</input_port>
+      <input_port name="server_timeout">Server timeout</input_port>
+      <output_port name="error_code_id">Follow Path error code</output_port>
+    </Action>
+    <Condition ID="WouldAControllerRecoveryHelp">
+      <input_port name="error_code">Error code</input_port>
+    </Condition>
+    <Condition ID="WouldAPlannerRecoveryHelp">
+      <input_port name="error_code">Error code</input_port>
+    </Condition>
+  </TreeNodesModel>
+
+</root>
