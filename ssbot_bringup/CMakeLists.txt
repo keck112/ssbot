@@ -12,13 +12,11 @@ install(DIRECTORY
   params
   rviz
   maps
-  graphs
   worlds
   DESTINATION share/${PROJECT_NAME}
 )
 
 install(PROGRAMS
-  src/route_gui_commander.py
   src/trajectory_starter.py
   src/pose_saver.py
   DESTINATION lib/${PROJECT_NAME}

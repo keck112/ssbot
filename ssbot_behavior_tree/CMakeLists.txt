@@ -5,37 +5,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(nav2_behavior_tree REQUIRED)
-find_package(nav2_msgs REQUIRED)
-find_package(behaviortree_cpp REQUIRED)
-
-# ── BT 커스텀 노드 플러그인 빌드 ──────────────────────
-add_library(ssbot_bt_nodes SHARED
-  src/bt_nodes/wait_action.cpp
-)
-
-target_include_directories(ssbot_bt_nodes PUBLIC
-  include
-)
-
-ament_target_dependencies(ssbot_bt_nodes
-  rclcpp
-  nav2_behavior_tree
-  nav2_msgs
-  behaviortree_cpp
-)
-
-install(TARGETS ssbot_bt_nodes
-  DESTINATION lib
-)
-
-install(DIRECTORY include/
-  DESTINATION include
-)
-# ────────────────────────────────────────────────────
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

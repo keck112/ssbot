@@ -17,8 +17,7 @@ def generate_launch_description():
     urdf_file = os.path.join(pkg_description, 'urdf', 'ssbot.urdf.xacro')
     bridge_config = os.path.join(pkg_bringup, 'params', 'ros_gz_bridge.yaml')
 
-    default_world = os.path.join(
-        get_package_share_directory('nav2_minimal_tb4_sim'), 'worlds', 'warehouse.sdf')
+    default_world = os.path.join(pkg_bringup, 'worlds', 'warehouse.sdf')
 
     world = LaunchConfiguration('world')
     headless = LaunchConfiguration('headless')

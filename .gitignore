@@ -30,3 +30,5 @@ Thumbs.db
 # Local environment
 .env
 *.local
+CLAUDE.md
+isaac_ros.md
