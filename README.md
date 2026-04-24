@@ -119,7 +119,7 @@ ros2 launch ssbot_bringup gazebo_launch.py
 ros2 launch ssbot_bringup bringup_launch.py use_sim_time:=true slam:=true
 
 # Terminal 3
-ros2 launch ssbot_bringup rviz_launch.py
+ros2 launch ssbot_bringup rviz_launch.py use_sim_time:=true
 
 # Terminal 4 (수동 조작)
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
@@ -135,7 +135,7 @@ ros2 launch ssbot_bringup gazebo_launch.py
 ros2 launch ssbot_bringup bringup_launch.py use_sim_time:=true
 
 # Terminal 3
-ros2 launch ssbot_bringup rviz_launch.py
+ros2 launch ssbot_bringup rviz_launch.py use_sim_time:=true
 ```
 
 ### 런치 인자
