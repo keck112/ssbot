@@ -1,5 +1,0 @@
-repositories:
-  dual_laser_merger:
-    type: git
-    url: https://github.com/keck112/dual_laser_merger.git
-    version: jazzy
